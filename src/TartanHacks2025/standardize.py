@@ -1,0 +1,81 @@
+import json
+import os
+from collections import defaultdict
+from openai import OpenAI
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
+def standardize_json(input_json, output_json):
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise EnvironmentError("OPENAI_API_KEY is not set. Please configure it in your environment before running `standardize_json`.")
+
+    client = OpenAI(api_key=api_key)
+
+    output_file = "output/standardized.json"
+
+    def reader(file_path):
+        with open(file_path, "r", encoding="utf-8") as file:
+            return file.read()
+
+
+    # Load the JSON file
+    with open(input_json, "r", encoding="utf-8") as file:
+        json_data = json.load(file)
+
+    # Create a dictionary to store object counts
+    objects = {}
+
+    # Iterate through all timestamps
+    for timestamp, data in json_data.items():
+        if "objects" in data:
+            for obj in data["objects"]:
+                objects[obj] = ""
+
+    # Save extracted objects to a file for debugging
+    print(f"✅ Extracted {len(objects)} unique objects.")
+
+    def api_call(dic):
+        PROMPT_MESSAGES = [
+                {
+                    "role": "system",
+                    "content": reader('prompts/standardizeprompt.txt')
+                },
+                {
+                    "role": "user",
+                    "content": f"{dic}"
+                }
+            ]
+
+        params = {
+            "model": "gpt-4o",
+            "messages": PROMPT_MESSAGES,
+            "response_format": { "type": "json_object" }
+        }
+        result = client.chat.completions.create(
+            **params
+        )
+        return result.choices[0].message.content
+    try:
+        parsed_json = json.loads(api_call(objects))
+    except json.JSONDecodeError:
+        print("❌ Failed to parse JSON")
+
+
+    # with open(output_file, "w", encoding="utf-8") as file:
+    #     json.dump(parsed_json, file, indent=4)
+    # print(f"✅ Output saved to {output_file}")
+
+
+    for timestamp, data in json_data.items():
+        if "objects" in data:
+            categorized_list = [parsed_json.get(obj, "Unknown") for obj in data["objects"]]
+            json_data[timestamp]["categories"] = list(set(categorized_list))  # Remove duplicates
+
+    # ✅ Save updated JSON file
+    with open(output_json, "w", encoding="utf-8") as file:
+        json.dump(json_data, file, indent=4)
+
+    print("✅ Updated JSON saved as data_categorized.json")
