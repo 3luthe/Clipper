@@ -96,7 +96,7 @@ src/
 npm run electron
 ```
 - Starts Vite dev server (port 5173)
-- Starts Python Flask API (port 5000)
+- Starts Python Flask API (port 5001)
 - Opens Electron window (1600x1000)
 
 ### 2. Video Analysis Flow
@@ -221,9 +221,10 @@ xs: 4px    sm: 8px    md: 16px    lg: 24px    xl: 32px
 
 ```bash
 # Development
-npm run electron         # Start app (frontend + backend)
+npm run electron         # Start app (frontend + backend + Electron) - RECOMMENDED
 npm run dev             # Vite dev server only
-python src/api_server.py # Backend only
+npm run backend         # Backend only (from video-analyzer-app dir)
+python src/api_server.py # Backend only (from project root)
 
 # Build
 npm run build           # Build frontend
@@ -318,7 +319,7 @@ data/thumbnails/
 ---
 
 **App is live at:** http://localhost:5173 (dev server)
-**API running at:** http://localhost:5000 (Flask)
+**API running at:** http://localhost:5001 (Flask)
 
 🚀 **Ready to analyze and search videos!**
 

@@ -1,6 +1,7 @@
 boto3
 elevenlabs
 flask
+flask-cors
 ipython
 moviepy
 nltk
@@ -12,7 +13,5 @@ python-dotenv
 PyQt5
 requests
 scikit-learn
-torch
 ultralytics
 colour-science
-

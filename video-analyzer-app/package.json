@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "electron": "cross-env NODE_ENV=development concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "backend": "cd .. && .venv/bin/python src/api_server.py",
+    "start-servers": "concurrently --kill-others \"npm run dev\" \"npm run backend\"",
+    "electron": "concurrently --kill-others \"npm run dev\" \"npm run backend\" \"wait-on http://localhost:5173 http://localhost:5001/api/health && cross-env NODE_ENV=development electron .\"",
     "electron:build": "npm run build && electron-builder"
   },
   "build": {

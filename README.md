@@ -45,7 +45,30 @@ nltk-downloader punkt
 
 Ensure FFmpeg is on your `PATH`. On macOS you can install it via Homebrew: `brew install ffmpeg`.
 
-## Running the Core Pipeline
+## Running the Video Analyzer App (Recommended)
+
+The new **Electron desktop app** provides a beautiful Premiere Pro-inspired interface for video analysis and semantic search:
+
+```bash
+cd video-analyzer-app
+npm install
+npm run electron
+```
+
+This will:
+- Start the Vite dev server (port 5173)
+- Start the Python Flask API (port 5001)
+- Open the Electron app window
+
+**Features:**
+- 🔍 Semantic search by vibe, objects, mood, location
+- 🎨 Modern dark theme with smooth animations
+- 📊 Thumbnail grid with frame-level metadata
+- ⚡ Fast TF-IDF-based search matching
+
+See `ELECTRON_APP_SUMMARY.md` for detailed documentation.
+
+## Running the Core Pipeline (Legacy)
 
 Prepare your assets:
 
