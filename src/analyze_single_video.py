@@ -120,7 +120,12 @@ Required JSON structure:
 async def process_video(video_path, video_id, metadata_path, thumbnails_folder, progress_callback=None):
     """Process a single video with OpenAI Vision API"""
 
-    client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise Exception("OPENAI_API_KEY not found in environment variables. Please set it in .env file.")
+    
+    print(f"OpenAI API key found: {api_key[:10]}...", flush=True)
+    client = AsyncOpenAI(api_key=api_key)
 
     if not os.path.exists(video_path):
         raise Exception(f"Video not found: {video_path}")
@@ -137,6 +142,9 @@ async def process_video(video_path, video_id, metadata_path, thumbnails_folder, 
     # Extract frames
     frames_to_process = []
     frame_count = 0
+    
+    print(f"Video FPS: {fps}", flush=True)
+    print("Extracting frames (1 per second)...", flush=True)
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -177,28 +185,49 @@ async def process_video(video_path, video_id, metadata_path, thumbnails_folder, 
     cap.release()
 
     total_frames = len(frames_to_process)
-    print(f"Extracted {total_frames} frames, starting analysis...")
+    if total_frames == 0:
+        raise Exception("No frames extracted from video")
+    
+    print(f"Extracted {total_frames} frames to analyze", flush=True)
+    print("Starting OpenAI Vision API analysis...", flush=True)
 
-    # Process frames in batches
+    # Process frames in batches with higher concurrency
+    # Using semaphore to control max concurrent requests (avoid rate limits)
+    # Can be configured via ANALYZE_CONCURRENT_REQUESTS env var (default: 20)
+    max_concurrent = int(os.getenv("ANALYZE_CONCURRENT_REQUESTS", "20"))
+    semaphore = asyncio.Semaphore(max_concurrent)
+    
+    async def analyze_with_semaphore(timestamp, img_base64):
+        """Wrapper to limit concurrent API calls"""
+        async with semaphore:
+            return await analyze_frame_async(client, img_base64, timestamp)
+    
     metadata = []
-    batch_size = 5
+    batch_size = 50  # Larger batches for better throughput
 
+    print(f"Processing {total_frames} frames with {max_concurrent} concurrent requests per batch...", flush=True)
+    
     for i in range(0, len(frames_to_process), batch_size):
         batch = frames_to_process[i:i + batch_size]
+        batch_num = (i // batch_size) + 1
+        total_batches = (len(frames_to_process) + batch_size - 1) // batch_size
+        print(f"Processing batch {batch_num}/{total_batches} ({len(batch)} frames)...", flush=True)
 
-        # Process batch concurrently
-        tasks = [analyze_frame_async(client, img_base64, ts) for ts, img_base64, _ in batch]
+        # Process batch concurrently with semaphore limiting
+        tasks = [analyze_with_semaphore(ts, img_base64) for ts, img_base64, _ in batch]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Process results
         for (timestamp, _, thumbnail_path), result in zip(batch, results):
             if isinstance(result, Exception):
-                print(f"Error at {timestamp}s: {result}")
+                print(f"Error at {timestamp}s: {result}", flush=True)
                 continue
 
+            # Result is a tuple: (frame_data, error)
             frame_data, error = result
+            
             if error:
-                print(f"Frame {timestamp}s error: {error}")
+                print(f"Frame {timestamp}s error: {error}", flush=True)
                 continue
 
             # Add thumbnail path
@@ -210,11 +239,11 @@ async def process_video(video_path, video_id, metadata_path, thumbnails_folder, 
             if progress_callback:
                 progress_callback(progress, timestamp)
 
-            print(f"✓ Frame {timestamp}s analyzed ({len(metadata)}/{total_frames})")
+            print(f"✓ Frame {timestamp}s analyzed ({len(metadata)}/{total_frames})", flush=True)
 
-        # Small delay between batches
+        # Small delay between batches to avoid overwhelming the API
         if i + batch_size < len(frames_to_process):
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.1)  # Reduced delay since we have semaphore limiting
 
     # Save metadata
     with open(metadata_path, "w", encoding="utf-8") as f:
@@ -223,17 +252,24 @@ async def process_video(video_path, video_id, metadata_path, thumbnails_folder, 
     # Update cache
     update_video_entry(video_id, metadata_file=metadata_path, mtime=os.path.getmtime(video_path))
 
-    print(f"✅ Analysis complete: {len(metadata)} frames saved to {metadata_path}")
+    print(f"✅ Analysis complete: {len(metadata)} frames saved to {metadata_path}", flush=True)
     return len(metadata)
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python analyze_single_video.py <video_path>")
+        print("Usage: python analyze_single_video.py <video_path>", flush=True)
         sys.exit(1)
 
     video_path = sys.argv[1]
+    print(f"Starting analysis of: {video_path}", flush=True)
+    
+    if not os.path.exists(video_path):
+        print(f"ERROR: Video file not found: {video_path}", flush=True)
+        sys.exit(1)
+    
     video_id = video_id_for_path(video_path)
+    print(f"Video ID: {video_id}", flush=True)
 
     # Setup paths
     metadata_folder = os.path.join("data", "metadata")
@@ -242,12 +278,17 @@ if __name__ == "__main__":
     os.makedirs(thumbnails_folder, exist_ok=True)
 
     metadata_path = os.path.join(metadata_folder, f"{video_id}_objects.json")
+    print(f"Metadata will be saved to: {metadata_path}", flush=True)
 
     # Run analysis
     try:
-        asyncio.run(process_video(video_path, video_id, metadata_path, thumbnails_folder))
-        print("SUCCESS")
+        print("Initializing OpenAI client...", flush=True)
+        result = asyncio.run(process_video(video_path, video_id, metadata_path, thumbnails_folder))
+        print(f"SUCCESS: Analyzed {result} frames", flush=True)
+        sys.exit(0)
     except Exception as e:
-        print(f"ERROR: {e}")
+        print(f"ERROR: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 

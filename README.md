@@ -47,11 +47,44 @@ Ensure FFmpeg is on your `PATH`. On macOS you can install it via Homebrew: `brew
 
 ## Running the Video Analyzer App (Recommended)
 
-The new **Electron desktop app** provides a beautiful Premiere Pro-inspired interface for video analysis and semantic search:
+The new **Electron desktop app** provides a beautiful Premiere Pro-inspired interface for video analysis and semantic search.
 
+### 🚀 Quick Setup (Automated)
+
+**For macOS/Linux:**
+```bash
+bash setup.sh
+bash run.sh
+```
+
+**For Windows (PowerShell):**
+```powershell
+.\setup.ps1
+.\run.ps1
+```
+
+The setup script will automatically:
+- ✅ Check prerequisites (Node.js, Python)
+- ✅ Create Python virtual environment
+- ✅ Install all Python packages (Flask, scikit-learn, OpenAI, etc.)
+- ✅ Install all Node.js packages
+- ✅ Prompt for OpenAI API key
+- ✅ Verify installation
+
+### 📝 Manual Setup
+
+If you prefer manual setup, see **[SETUP.md](SETUP.md)** for detailed step-by-step instructions.
+
+### Running the App
+
+After setup, run:
+```bash
+bash run.sh
+```
+
+Or manually:
 ```bash
 cd video-analyzer-app
-npm install
 npm run electron
 ```
 

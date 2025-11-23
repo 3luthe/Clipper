@@ -384,18 +384,30 @@ def start_analysis():
                 print(f"  Python: {python_path}")
                 print(f"  Script: {script_path}")
                 print(f"  Video: {video['path']}")
+                
+                # Set initial progress
+                analysis_progress['progress'] = 1
+                analysis_progress['message'] = f"Initializing analysis for {video['filename']}..."
 
                 try:
-                    # Run the actual analysis script
+                    # Run the actual analysis script with unbuffered output
+                    env = os.environ.copy()
+                    env['PYTHONUNBUFFERED'] = '1'
+                    
+                    # Use project root as working directory
+                    project_root = os.path.dirname(os.path.dirname(__file__))
+                    
                     process = subprocess.Popen(
-                        [python_path, script_path, video['path']],
+                        [python_path, '-u', script_path, video['path']],
                         stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,  # Combine stderr into stdout
                         text=True,
-                        bufsize=1
+                        bufsize=1,  # Line buffered
+                        env=env,
+                        cwd=project_root  # Run from project root
                     )
 
-                    # Monitor progress
+                    # Monitor progress line by line
                     stderr_output = []
                     while True:
                         output = process.stdout.readline()
@@ -403,24 +415,25 @@ def start_analysis():
                             break
                         if output:
                             line = output.strip()
-                            print(f"[ANALYSIS] {line}")
+                            if line:
+                                print(f"[ANALYSIS] {line}")
 
-                            # Parse progress from output
-                            if '✓ Frame' in line and '/' in line:
-                                try:
-                                    # Extract progress like "5/10"
-                                    parts = line.split('(')[1].split(')')[0]  # "5/10"
-                                    current, total = parts.split('/')
-                                    progress = int((int(current) / int(total)) * 100)
-                                    analysis_progress['progress'] = progress
-                                except:
-                                    pass
-
-                    # Capture any stderr output
-                    stderr = process.stderr.read()
-                    if stderr:
-                        stderr_output.append(stderr)
-                        print(f"[STDERR] {stderr}")
+                                # Parse progress from output
+                                if '✓ Frame' in line and '/' in line:
+                                    try:
+                                        # Extract progress like "5/10"
+                                        parts = line.split('(')[1].split(')')[0]  # "5/10"
+                                        current, total = parts.split('/')
+                                        progress = int((int(current) / int(total)) * 100)
+                                        analysis_progress['progress'] = progress
+                                        print(f"[PROGRESS] {progress}%")
+                                    except Exception as e:
+                                        print(f"[PROGRESS PARSE ERROR] {e}: {line}")
+                                
+                                # Check for errors
+                                if 'ERROR' in line or 'error' in line.lower():
+                                    stderr_output.append(line)
+                                    analysis_progress['message'] = f"Error: {line}"
 
                     # Wait for completion
                     return_code = process.wait()
