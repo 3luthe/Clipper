@@ -177,6 +177,7 @@ body {
   color: var(--text-primary);
   font-size: 14px;
   transition: all 0.2s ease;
+  line-height: 44px;
 }
 
 .search-input:focus {
@@ -189,10 +190,15 @@ body {
   position: absolute;
   left: 14px;
   top: 50%;
-  transform: translateY(-50%);
+  transform: translateY(calc(-50% - 22px)); /* Move icon up by 1px */
   color: var(--text-tertiary);
   pointer-events: none;
   z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
 }
 
 /* Filter Pills */
